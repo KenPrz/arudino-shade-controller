@@ -1,14 +1,16 @@
 #include <dht.h>
 #include <Servo.h>
 
-#define stepPin 2
-#define dirPin 5
+#define stepPin 4
+#define dirPin 7
 
 #define soilWet 500
 #define soilDry 300
 
 #define sensorPower 7
 #define sensorPin A0
+
+#define microDelay 850
 
 dht DHT;
 Servo servo;
@@ -48,19 +50,19 @@ void loop() {
   float humidity = DHT.humidity;
   int moisture = readSensor();
 
+  displayReadings(temperature, humidity, moisture);
+
   // Check if temperature and humidity are valid (not NaN)
   if (!isnan(temperature) && !isnan(humidity)) {
     // Check if temperature and humidity are above the thresholds to pull the shade
     if (temperature > TEMP_THRESHOLD && humidity > HUM_THRESHOLD && !isShadePulled) {
       pullShade();
-      isShadePulled = true;
-      isShadeRetracted = false;
+      retractShade();
+
     }
     // Check if temperature and humidity are below the thresholds to retract the shade
     else if (temperature <= TEMP_THRESHOLD && humidity <= HUM_THRESHOLD && !isShadeRetracted) {
       retractShade();
-      isShadePulled = false;
-      isShadeRetracted = true;
     }
   }
 
@@ -75,17 +77,19 @@ void loop() {
     }
   }
 
-  delay(15000); // Delay before next reading
+  delay(5000); // Delay before next reading
 }
 
 void pullShade() {
   digitalWrite(dirPin, HIGH); // Enables the motor to move in a particular direction (change on testing)
-  for (int x = 0; x < (10 * 200); x++) {
+  for (int x = 0; x < 2000; x++) {
     digitalWrite(stepPin, HIGH);
-    delayMicroseconds(1200);    // by changing this time delay between the steps we can change the rotation speed
+    delayMicroseconds(microDelay);    // by changing this time delay between the steps we can change the rotation speed
     digitalWrite(stepPin, LOW);
-    delayMicroseconds(1200);
+    delayMicroseconds(microDelay);
   }
+    isShadePulled = true;
+    isShadeRetracted = false;
 }
 
 void retractShade() {
@@ -93,10 +97,12 @@ void retractShade() {
   // Makes 400 pulses for making two full cycle rotation
   for (int x = 0; x < (10 * 200); x++) {
     digitalWrite(stepPin, HIGH);
-    delayMicroseconds(1500);
+    delayMicroseconds(microDelay);
     digitalWrite(stepPin, LOW);
-    delayMicroseconds(1500);
+    delayMicroseconds(microDelay);
   }
+    isShadePulled = false;
+    isShadeRetracted = true;
   delay(1000);
 }
 
@@ -112,12 +118,8 @@ void waterThePlants() {
     delay(delayTime);
   }
 
-  int x = readSensor();
-  while (x > soilDryThreshold) {
-    x = readSensor();
-  }
 
-  delay(10000);
+  delay(3000);
 
   for (int pos = endPos; pos >= startPos; pos -= increment) {
     servo.write(pos);
@@ -132,4 +134,21 @@ int readSensor() {
   digitalWrite(sensorPower, LOW);   // Turn the sensor OFF
   return val;                          // Return analog moisture value
 }
+
+void displayReadings(float temp, float hum, int moisture){
+  Serial.print("Temperature: ");
+  Serial.print(temp);
+  Serial.println(" °C");
+
+  Serial.print("Humidity: ");
+  Serial.print(hum);
+  Serial.println(" %");
+
+  Serial.print("Soil Moisture: ");
+  Serial.println(moisture);
+
+  Serial.print("Shade status: ");
+  Serial.println(isShadePulled == true ? "Open" : "Closed");
+}
+
 
